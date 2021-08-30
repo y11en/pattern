@@ -251,6 +251,8 @@ This works great with the `const char*` parameter type: You'll see "Hello world"
 
 Astonishingly, `std::string` has no constructor that takes a `std::nullptr_t`. Neither does `std::string_view`. These types allow the `std::nullptr_t` to decay to a null-valued `const char*`, and to initialize the string object _to an undefined state!_. In the libstdc++ implementation, `std::string` immediately throws `std::logic_error` and `std::string_view` segfaults. The sane behavior would be for both types to have deleted `std::nullptr_t` constructors (that is pattern-matching friendly, as the _inspect-clause_ would fail during substitution and just be removed as an inspect alternative) and for null-valued character pointers to create zero-length strings and views. Parts of the C++ standard library have easily-violated, non-obvious preconditions that lead to undefined behavior. Implementors should patch these problems, because they're sure to arise more often as pattern matching takes off.
 
+In the [string.cxx](string.cxx) sample, you can uncomment the `is nullptr` clause to guard null-valued initializers. 
+
 [**string2.cxx**](string2.cxx)
 ```cpp
 #include <iostream>
@@ -272,7 +274,7 @@ int main() {
   f(nullptr);
 }
 ```
-In the [string.cxx](string.cxx) sample, you can uncomment the `is nullptr` clause to guard null-valued initializers. You can even make this check part of the _constraint-sequence_ on the string conversion. [string2.cxx](string2.cxx) demonstrates how this mitigates the problem, but the burden should be on the library to deliver a robust data type, rather than the user to enforce such preconditions.
+You can even make the null pointer check part of the _constraint-sequence_ on string conversion. [string2.cxx](string2.cxx) demonstrates how this mitigates the problem, but I feel the burden should be on the library to deliver a robust data type, rather than the user to enforce such preconditions.
 
 ### Supporting `std::variant` by extending `is` and `as`
 
@@ -289,7 +291,7 @@ Handling of the indexed form is really involved. The compiler frontend calls `op
 
 In the proposal, `std::variant`'s indexed `operator is` returns `size_t`, and each indexed specialization of `operator as<I>` returns `std::get<I>(x)`, causing the return type to be deduced as the type of the `I`'th variant member.
 
-This will not work, because of the way the proposal probes variant members. It attemps to call `operator as<I>` with ascending arguments `I` until substitution failure ends the process. At that point, variant alternatives are collected into the bool-yielding switch. But the proposed implementation won't produce a substitution failure when `I` is out of range. If we specialize `operator as<3>` and pass it a three-member `std::variant`, the index is out of range. `std::get<3>` is ill-formed, and raises a compile-time error, inside the function definition, which is outside of a SFINAE context. The entire translation unit breaks during probing.
+This will not work, because of the way the proposal probes variant members. It attempts to call `operator as<I>` with ascending arguments `I` until substitution failure ends the process. At that point, variant alternatives are collected into the bool-yielding switch. But the proposed implementation won't produce a substitution failure when `I` is out of range. If we specialize `operator as<3>` and pass it a three-member `std::variant`, the index is out of range. `std::get<3>` is ill-formed, and raises a compile-time error, inside the function definition, which is outside of a SFINAE context. The entire translation unit breaks during probing.
 
 ```cpp
 template<size_t I, typename... Ts> requires(I < sizeof...(Ts))
@@ -432,9 +434,9 @@ In the second line, `^` generates a switcth for all variant members, and tests e
 
 If the initializer expression isn't a variant (i.e. doesn't have an indexed form of `operator is`), then `^` is a no-op, and pattern matching does business as usual.
 
-My opinion is that much of the power of the pattern matching proposal is left on the table, by not making available to variant types.
+My opinion is that much of the power of the pattern matching proposal is left on the table, by not making its semantics available to a variant's active member.
 
-Could we treat variants generically without a special operator? Certainly. Is that too permissive? I don't really know. A special operator creates the distinction between an object and the thing it contains. On the other hand, implicitly generating switches over variant members to capture the power of pattern matching erases this distinction. Maybe it's better, but it is more like the behavior of a dynamic language than C++, the emperor of statically-typed languages.
+Could we treat variants generically without a special operator? Certainly. Is that too permissive? I don't really know. A special operator creates the distinction between an object and the thing it contains. On the other hand, relying on implicitly-generated switches over variant members capture the power of pattern matching, but this erase this type distinction. Maybe the latter approach is better, but it's more like the behavior of a dynamic language than it is like C++, emperor of statically-typed languages.
 
 The story for `std::any` is worse. There's no way to figure out what an `any` holds. It can literally hold anything. Even in theory, there's no way to test the contents of `any` against constraints, against destructure patterns, or really utilize any of the advanced features in the pattern matching proposal. I don't think effort should be spent to support `any`. 
 
@@ -567,7 +569,7 @@ std::ostream& operator<<(std::ostream& os, const std::pair<A, B>& pair) {
   return os;
 }
 
-auto in(const auto& min, const auto& max) {
+auto in(auto min, auto max) {
   // The constraint on the parameter x is requried to prevent
   // an ill-formed definition. A modern C++ idiom is to write the
   // expression three times:
@@ -725,7 +727,6 @@ struct Player {
   int coins; 
 };
 
-template<typename Player>
 void get_hint(const Player& p) {
   std::cout<< p.name<< " -- ";
   inspect(p) {
@@ -742,16 +743,16 @@ void get_hint(const Player& p) {
 }
 
 int main() {
-  get_hint(Player{ "George Washington", 1000, 500 });
-  get_hint(Player{ "Julius Caeser", 1, 1000 });
-  get_hint(Player{ "Oliver Twist", 100, 10 });
+  get_hint({ "George Washington", 1000, 500 });
+  get_hint({ "Julius Caesar", 1, 1000 });
+  get_hint({ "Oliver Twist", 100, 10 });
 }
 ```
 ```
 $ circle pattern2.cxx
 $ ./pattern2
 George Washington -- Get hitpoints and ammo!
-Julius Caeser -- You're almost destroyed.
+Julius Caesar -- You're almost destroyed.
 Oliver Twist -- Get more coins!
 ```
 

@@ -7,7 +7,6 @@ struct Player {
   int coins; 
 };
 
-template<typename Player>
 void get_hint(const Player& p) {
   std::cout<< p.name<< " -- ";
   inspect(p) {
@@ -24,7 +23,7 @@ void get_hint(const Player& p) {
 }
 
 int main() {
-  get_hint(Player{ "George Washington", 1000, 500 });
-  get_hint(Player{ "Julius Caeser", 1, 1000 });
-  get_hint(Player{ "Oliver Twist", 100, 10 });
+  get_hint({ "George Washington", 1000, 500 });
+  get_hint({ "Julius Caesar", 1, 1000 });
+  get_hint({ "Oliver Twist", 100, 10 });
 }

@@ -6,7 +6,7 @@ My thanks to Johel Ernesto Guerrero Peña and Michael Park for discussions that 
 
 ## Contents
 
-* [The fundamentals of pattern matching](#the-fundamentals-of-pattern-matching
+* [Fundamentals of pattern matching](#fundamentals-of-pattern-matching
 )
   * [Constraints](#constraints)
   * [Preconditions](#preconditions)
@@ -17,10 +17,10 @@ My thanks to Johel Ernesto Guerrero Peña and Michael Park for discussions that 
   * [Constraints and expressions](#constraint-and-expressions)
 * [Bindings and patterns](#bindings-and-patterns)
   * [Designated bindings and patterns](#designated-bindings-and-patterns)
+  * [Dereference operator](#dereference-operator)
 
 
-
-## The fundamentals of pattern matching
+## Fundamentals of pattern matching
 
 This proposal is big. There's a lot of new syntax. There's a lot of new functionality. There are five major feature domains:
 1. _is-expression_ and the overloadable `operator is`.
@@ -205,7 +205,7 @@ constraint.cxx:13:7
                      ^
 ```
 
-We call `f` and pass `10` as an argument. That's fine, no problem. Now we call `f` and pass the string "Hello world". This breaks translation! The call to `even` isn't rejected during overload resolution, because the `const char*` parameter type doesn't violate any constraints. The `f<const char*>` specialization compiles just fine. But when the compiler's codegen attemps to instantiate the function definition, that fails, because you can't take the modulus of a `const char*`. The program is ill-formed because we suffered a failure _outside of a SFINAE context_.
+We call `f` and pass `10` as an argument. That's fine, no problem. Now we call `f` and pass the string "Hello world". This breaks translation! The call to `even` isn't rejected during overload resolution, because the `const char*` parameter type doesn't violate any constraints. The `f<const char*>` specialization passes overload resolution just fine. But when the compiler's codegen attempts to instantiate the function definition, that fails, because you can't take the modulus of a `const char*`. Since we suffered a failure _outside of a SFINAE context_, the program is ill-formed.
 
 ### Preconditions
 
@@ -706,7 +706,11 @@ $ ./pattern
 { a:5.5, b:6.6, c:7.7, d:8.8 }: 5.5 6.6 7.7 8.8 
 ```
 
-The [pattern.cxx](pattern.cxx) shows a 
+The [pattern.cxx](pattern.cxx) sample demonstrates destructure patterns as _is-operands_, and structured bindings as constraint declarations. If the _constraint-sequence_ passes, then the structured binding is initialized, and its declarations made available in the successor.
+
+Bindings and patterns support recursive definitions. The patterns in the same use type operands (`int`), value operands (`0` and `even`) and constraint operands (`integral`).
+
+The `[...pack]` binding serves as a backstop for all structured initializer types: tuple-like classes, arrays, vector, matrices and all other classes match the `[...]` binding. `pack` is a parameter pack declaration, which provides generic access to all of the initializer's elements. `cout<< pack<< " " ...` prints all the pack elements. You can use Circle's static subscript `...[index]` or static slice `...[begin:end:step]` operators effect transformations on pack operands.
 
 ### Designated bindings and patterns
 
@@ -721,29 +725,40 @@ struct Player {
   int coins; 
 };
 
+template<typename Player>
 void get_hint(const Player& p) {
   std::cout<< p.name<< " -- ";
   inspect(p) {
-    is [hitpoints: 1]             => std::cout<< "You're almost destroyed.\n";
-    is [hitpoints: 10, coins: 10] => std::cout<< "I need the hints from you!\n";
-    is [coins: 10]                => std::cout<< "Get more coins!\n";
-    is [hitpoints: 10]            => std::cout << "Get more hitpoints!\n";
-    [name: n] => {
-      if (n != "The Bruce Dickenson")
-        std::cout << "Get more hitpoints and ammo!\n";
-      else
-        std::cout << "More cowbell!\n";
+    is [hitpoints: 1]               => std::cout<< "You're almost destroyed.\n";
+    is [hitpoints: 10, coins: 10]   => std::cout<< "I need the hints from you!\n";
+    is [coins: 10]                  => std::cout<< "Get more coins!\n";
+    is [hitpoints: 10]              => std::cout<< "Get more hitpoints!\n";
+    [name: n] {
+      if n != "The Bruce Dickenson" => std::cout<< "Get hitpoints and ammo!\n";
+      is _                          => std::cout<< "More cowbell!\n";
     }
+    is _                            => std::cout<< "You're doing fine.\n";
   }
 }
 
 int main() {
-  get_hint({ "George Washington", 1000, 500 });
-  get_hint({ "Julius Caeser", 1, 1000 });
-  get_hint({ "Oliver Twist", 100, 10 });
+  get_hint(Player{ "George Washington", 1000, 500 });
+  get_hint(Player{ "Julius Caeser", 1, 1000 });
+  get_hint(Player{ "Oliver Twist", 100, 10 });
 }
 ```
+```
+$ circle pattern2.cxx
+$ ./pattern2
+George Washington -- Get hitpoints and ammo!
+Julius Caeser -- You're almost destroyed.
+Oliver Twist -- Get more coins!
+```
 
+[pattern2.cxx](pattern2.cxx) ports a sample from [P1317R3 - Pattern Matching](
+http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1371r3.pdf). It demonstrates designated patterns and bindings. While the P2392 flavor of pattern matching generally separates declarations and tests (declarations go on the left inside bindings, tests go to the right inside patterns), bindings do imply static testing. The `[name: n]` binding requires that the initializer object has a data member called `name`, or that constraint with its successors will be dropped.
+
+### Dereference operator
 
 
 

@@ -417,7 +417,9 @@ Do we need a special operator to express this intent? Would `isas int` be useful
 
 There is an expectation for pattern matching to work uniformly on any type. Although there is extensible mechanism to deal with any type, it's not as automatic or as uniform as you may hope. This sample from the proposal suggests that `f` works uniformly for any type, including `variant` and `any`. `i as int` does work for `variant` and `any`, provided their contents are `int`. It will match any other numeric type. If you call `f(10u)`, `i as int` will convert the `unsigned` initializer to `int`, then bind `i` with the converted integer. The same will not happen with `std::variant<unsigned>` or `std::any` holding an `unsigned` value.
 
-* `    is std::integral =>`
+```cpp
+    is std::integral => cout << "non-int integral " << x;
+```
 
 The next _inspect-clause_ is worse. `variant` and `any` will fail this test, no matter what the active member is. There is no language in the proposal for switching over the active member and applying a constraint. The overloadable `operator is` only exists when the right hand side `C` is an expression or a type, not when it's a concept/constraint.
 

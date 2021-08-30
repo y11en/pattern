@@ -4,6 +4,22 @@ Circle build 131 includes an implementation of [P2392R1 - _Pattern matching usin
 
 My thanks to Johel Ernesto Guerrero Peña and Michael Park for discussions that helped me understand the semantics of pattern matching.
 
+## Contents
+
+* [The fundamentals of pattern matching](#the-fundamentals-of-pattern-matching
+)
+  * [Constraints](#constraints)
+  * [Preconditions](#preconditions)
+  * [Supporting `std::variant` by extending `is` and `as`](#supporting-stdvariant-by-extending-is-and-as)
+  * [Pattern matching on `std::variant`](#pattern-matching-on-stdvariant)
+  * [Generic programming](#generic-programming)
+  * [Simpler overloads](#simpler-overloads)
+  * [Constraints and expressions](#constraint-and-expressions)
+* [Bindings and patterns](#bindings-and-patterns)
+  * [Designated bindings and patterns](#designated-bindings-and-patterns)
+
+
+
 ## The fundamentals of pattern matching
 
 This proposal is big. There's a lot of new syntax. There's a lot of new functionality. There are five major feature domains:
@@ -258,7 +274,7 @@ int main() {
 ```
 In the [string.cxx](string.cxx) sample, you can uncomment the `is nullptr` clause to guard null-valued initializers. You can even make this check part of the _constraint-sequence_ on the string conversion. [string2.cxx](string2.cxx) demonstrates how this mitigates the problem, but the burden should be on the library to deliver a robust data type, rather than the user to enforce such preconditions.
 
-## Supporting `std::variant` by extending `is` and `as`
+### Supporting `std::variant` by extending `is` and `as`
 
 ![](isas.png)
 
@@ -531,7 +547,7 @@ Notice the _requires-clauses_ on the `operator is` and `operator as` function te
 
 Comment out the constraints and trying building the sample. `as short =>` will specialize `operator is<short>`, and when that definition is instantiated, `holds_alternative<short>` will break, because `short` is not a variant member of its argument.
 
-## Constraints and expressions
+### Constraints and expressions
 
 ![](in.png)
 
@@ -602,7 +618,7 @@ The use of an _if-expression_ in a clause provides access to the ordinary C/C++ 
 
 Perhaps an abbreviated lambda will be introduced that implicitly includes the constraint and _noexcept-specifier_. 
 
-### Bindings and patterns
+## Bindings and patterns
 
 [C++17 structured bindings](https://en.cppreference.com/w/cpp/language/structured_binding) have been overhauled by pattern matching, and now may appear in _inspect-statements_. Patterns mimic the form of structured bindings and appear as the right-hand operand of _is-_ and _as-expressions_. 
 

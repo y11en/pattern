@@ -18,7 +18,7 @@ My thanks to Johel Ernesto Guerrero Peña and Michael Park for discussions that 
   * [Designated bindings and patterns](#designated-bindings-and-patterns)
   * [`as` patterns](#as-patterns)
   * [Dereference pattern](#dereference-pattern)
-* [Pattern matching enhancements](#pattern-matching-enhancements)
+  * [Patterns and reflection](#patterns-and-reflection)
 
 ## Fundamentals of pattern matching
 
@@ -852,6 +852,19 @@ If any of these tests or conversions fail either at compile or runtime, the _ins
 What if we don't want the conversion, but just want the pointer checks? The _is-pattern_ `[_, *_, **_]` tests the pointers of the implicit left-hand operand the same way, but rather than using `std::make_tuple` to create a result object, just yields true or false.
 
 A big strength of pattern matching is that these expressions are substituted in a SFINAE context. If they fail structurally, the clause is dropped from the enclosing _inspect-definition_. If they fail at runtime, execution just goes to the next clause. Programming this with if/else logic would look pretty ragged, requiring an ugly mix of _if-constexpr_ and _requires-expressions_ to guard against substitution and runtime errors. 
+
+### Patterns and reflection
+
+The Circle pattern matching implementation adds a special braced form left-hand operator for _is-patterns_. 
+
+* _{ braced-argument-set } is [ is-operands ]_
+
+The _is-pattern_ on the right must be a destructure pattern, not a designated pattern. This operator performs element-wise _is-expression_, and reduces the element-wise results to a single true or false.
+
+[**reflection.cxx**](reflection.cxx)
+```cpp
+
+```
 
 ### Multi-token type names
 

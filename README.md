@@ -409,6 +409,8 @@ Although `is int` is true, our expression doesn't behave like an `int`, _because
 
 `is int` is true on this variant, and then `as int` calls `operator as`, which delegates to `std::get` to return the active member. Now, the binding `i` is initialized with the result of that, so it holds a true `int`, rather than a variant, and the print statement compiles.
 
+Do we need a special operator to express this intent? Would `isas int` be useful for testing and accessing by type?
+
 ### Generic programming 
 
 ![](generic.png)

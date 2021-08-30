@@ -12,7 +12,7 @@ constexpr bool operator is(const std::variant<Ts...>& x) {
 
 template<typename T, typename... Ts>
 requires((... || T == Ts))
-constexpr T& as(std::variant<Ts...>& x) { 
+constexpr T& operator as(std::variant<Ts...>& x) { 
   return get<T>(x);
 }
 

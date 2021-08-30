@@ -294,7 +294,7 @@ This will not work, because of the way the proposal probes variant members. It a
 
 ```cpp
 template<size_t I, typename... Ts> requires(I < sizeof...(Ts))
-constexpr Ts...[I]& as(std::variant<Ts...>& x) { 
+constexpr Ts...[I]& operator as(std::variant<Ts...>& x) { 
   return std::get<I>(x);
 }
 ```
@@ -317,7 +317,7 @@ constexpr size_t operator is(const std::variant<Ts...>& x) {
 }
 
 template<size_t I, typename... Ts> requires(I < sizeof...(Ts))
-constexpr Ts...[I]& as(std::variant<Ts...>& x) { 
+constexpr Ts...[I]& operator as(std::variant<Ts...>& x) { 
   return std::get<I>(x);
 }
 
@@ -413,11 +413,11 @@ Although `is int` is true, our expression doesn't behave like an `int`, _because
 
 ![](generic.png)
 
-There is an expectation for pattern matching to work uniformly on any type. Although there is mechanism to deal with any type, it's not as automatic as you may hope. This sample from the proposal suggests that `f` works uniformly for any type, including `variant` and `any`. `i as int` does work for `variant` and `any`, provided their contents are `int`. It will match any other numeric type. If you call `f(10u)`, `i as int` will convert the `unsigned` initializer to `int`, then bind `i` with the converted integer. The same will not happen with `std::variant<unsigned>` or `std::any` holding an `unsigned` value.
+There is an expectation for pattern matching to work uniformly on any type. Although there is extensible mechanism to deal with any type, it's not as automatic or as uniform as you may hope. This sample from the proposal suggests that `f` works uniformly for any type, including `variant` and `any`. `i as int` does work for `variant` and `any`, provided their contents are `int`. It will match any other numeric type. If you call `f(10u)`, `i as int` will convert the `unsigned` initializer to `int`, then bind `i` with the converted integer. The same will not happen with `std::variant<unsigned>` or `std::any` holding an `unsigned` value.
 
-`    is std::integral =>`
+* `    is std::integral =>`
 
-The next _inspect-clause_ is worse. `variant` and `any` will fail this test, no matter what their active member is. There is no language in the proposal for switching over the active member and applying a constraint. The overloadable `operator is` only exists when the right hand side `C` is an expression or a type, not when it's a concept/constraint.
+The next _inspect-clause_ is worse. `variant` and `any` will fail this test, no matter what the active member is. There is no language in the proposal for switching over the active member and applying a constraint. The overloadable `operator is` only exists when the right hand side `C` is an expression or a type, not when it's a concept/constraint.
 
 I think pattern matching needs an additional operator: `^` when used in an _is-expression_ or _as-expression_ right-hand operand, accesses the _active member_ of the left-hand operand.
 
@@ -456,7 +456,7 @@ constexpr bool operator is(const std::variant<Ts...>& x) {
 
 template<typename T, typename... Ts>
 requires((... || T == Ts))
-constexpr T& as(std::variant<Ts...>& x) { 
+constexpr T& operator as(std::variant<Ts...>& x) { 
   return get<T>(x);
 }
 
@@ -538,7 +538,7 @@ constexpr bool operator is(const std::variant<Ts...>& x) {
 
 template<typename T, typename... Ts>
 requires((... || T == Ts))
-constexpr T& as(std::variant<Ts...>& x) { 
+constexpr T& operator as(std::variant<Ts...>& x) { 
   return get<T>(x);
 }
 ```

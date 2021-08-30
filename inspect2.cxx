@@ -10,7 +10,7 @@ constexpr size_t operator is(const std::variant<Ts...>& x) {
 }
 
 template<size_t I, typename... Ts> requires(I < sizeof...(Ts))
-constexpr Ts...[I]& as(std::variant<Ts...>& x) { 
+constexpr Ts...[I]& operator as(std::variant<Ts...>& x) { 
   return std::get<I>(x);
 }
 

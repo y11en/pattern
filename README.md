@@ -397,7 +397,7 @@ We start by running an `std::variant` through the _inspect-statement_. The first
     i is int as int     => std::cout<< "int "<< i<< "\n";
 ```
 
-Why `i is int as int` and not just `i is int`? This is another situation in which we have to aggressively constrain arguments to support generics in pattern matching. If you call `f(5)`, then `x` is `int` and everything works as expected. `i is int =>` first tests if the argument is `int` (it is), and binds `i` to the initializer, which is type `int`. The result statement can `std::cout<< i`, no problem.
+Why `i is int as int` and not just `i is int`? This is another situation in which we have to aggressively constrain arguments to support generics in pattern matching. If you call `f(5)`, then `x` is `int` and everything works as expected. `i is int =>` first tests if the argument is `int` (it is), and binds `i` to the initializer, which is type `int`. The result statement `std::cout<< i` compiles and executes, no problem.
 
 What happens when we pass `std::variant` with an `int` active member? `is int` finds the overloaded `operator is`, which returns the index of the active member. The compiler probes the indexed `operator as` and confirms that, yes, the index of the active member yields an `int` alternative. `is int` evaluates true. The binding `i` is initialized with `x`, which is still type `std::variant`. The result statement `std::cout<< i` tries printing `i`, which has type `std::variant`, breaking the translation unit and generating hundreds of lines of diagnostics: it prints all `operator<<` in standard library, and describes why of them doesn't work.
 
@@ -883,7 +883,5 @@ concept small_type = T is not void && sizeof(T) <= 4;
 ```
 
 You can mix cv-qualifiers and the array declarator `[bounds]` too. However, the tokens `&`, `&&` and `*` are _not_ greedily parsed as part of a type. Although doing so would break no existing code, it's likely not what you want. The `small_type` concept has two atomic constraints: first, `T` is not void; second, `sizeof(T) <= 4`. We want `&&` to delimit the constraints, and if that token were parsed greedily, we'd have to wrap the left constraint in parentheses. `&` and `*` likewise have binary operators, and this design favors treating those tokens as operators. However we may greedily consume `[]`, because there is no binary operator `[]`.
-
-### Potentially-throwing `operator as`
 
 

@@ -6,8 +6,7 @@ My thanks to Johel Ernesto Guerrero Peña and Michael Park for discussions that 
 
 ## Contents
 
-* [Fundamentals of pattern matching](#fundamentals-of-pattern-matching
-)
+* [Fundamentals of pattern matching](#fundamentals-of-pattern-matching)
   * [Constraints](#constraints)
   * [Preconditions](#preconditions)
   * [Supporting `std::variant` by extending `is` and `as`](#supporting-stdvariant-by-extending-is-and-as)
@@ -17,8 +16,9 @@ My thanks to Johel Ernesto Guerrero Peña and Michael Park for discussions that 
   * [Constraints and expressions](#constraint-and-expressions)
 * [Bindings and patterns](#bindings-and-patterns)
   * [Designated bindings and patterns](#designated-bindings-and-patterns)
-  * [Dereference operator](#dereference-operator)
-
+  * [`as` patterns](#as-patterns)
+  * [Dereference pattern](#dereference-pattern)
+* [Pattern matching enhancements](#pattern-matching-enhancements)
 
 ## Fundamentals of pattern matching
 
@@ -104,7 +104,6 @@ bool: true!
 long double: floating point 19.1
 const char*: string Yo
 std::nullptr_t: nullptr
-const char*: nullptr
 ```
 
 The `inspect` statement is a rich context for control-flow programming. It embeds a domain-specific language with new syntax for declaring bindings, tests, conversions, conditionals, sequences, alternatives, groups, and statement and expression results.
@@ -313,34 +312,33 @@ Generic pattern matching is _extra generic_, and will require more attention to 
 
 // std::variant operator-is support.
 template<typename T, typename... Ts>
-constexpr bool operator is(const std::variant<Ts...>& x) {
-  return holds_alternative<T>(x);
+constexpr size_t operator is(const std::variant<Ts...>& x) {
+  return x.index(); 
 }
 
-template<typename T, typename... Ts>
-constexpr T& as(std::variant<Ts...>& x) { 
-  return get<T>(x);
+template<size_t I, typename... Ts> requires(I < sizeof...(Ts))
+constexpr Ts...[I]& as(std::variant<Ts...>& x) { 
+  return std::get<I>(x);
 }
 
-template<typename T, typename... Ts>
-constexpr const T& operator as(const std::variant<Ts...>& x) { 
-  return get<T>(x);
+template<size_t I, typename... Ts> requires(I < sizeof...(Ts))
+constexpr const Ts...[I]& operator as(const std::variant<Ts...>& x) { 
+  return std::get<I>(x);
 }
 
 // std::any operator-is support.
-template<typename T>
-constexpr bool operator is(const std::any& x) { 
-  return typeid(T) == x.type(); 
+constexpr const std::type_info& operator is(const std::any& x) { 
+  return x.type(); 
 }
 
 template<typename T> requires (!T.is_reference)
 constexpr T operator as(const std::any& x) {
-  return any_cast<T>(x);
+  return std::any_cast<T>(x);
 }
 
 template<typename T> requires (T.is_reference)
 constexpr T& operator as(std::any& x) {
-  if(auto p = any_cast<T.remove_reference*>(&x))
+  if(auto p = std::any_cast<T.remove_reference*>(&x))
     return *p;
   throw std::bad_any_cast();
 }
@@ -353,12 +351,12 @@ constexpr bool even(std::integral auto x) {
 
 void f(const auto& x) {
   inspect(x) {
-    i as int            => std::cout<< "int "<< i<< "\n";
+    i is int as int     => std::cout<< "int "<< i<< "\n";
     i is std::integral {
       is even => std::cout<< "even non-int integral "<< i<< "\n";
       is _    => std::cout<< "odd non-int integral "<< i<< "\n";
     }
-    s as std::string    => std::cout<< "string "<< s<< "\n";
+    s as std::string    => std::cout<< "string \"" + s + "\"\n";
     is _                => std::cout<< "((no matching value))\n";
   }
 }
@@ -548,6 +546,8 @@ constexpr T& as(std::variant<Ts...>& x) {
 Notice the _requires-clauses_ on the `operator is` and `operator as` function templates. `std::holds_alternative` and `std::get` are each ill-formed when specialized on a type that isn't a variant member of the parameter. We must stave off an error in the function definition by raising a substitution failure in the _requires-clause_ of the function declaration. 
 
 Comment out the constraints and trying building the sample. `as short =>` will specialize `operator is<short>`, and when that definition is instantiated, `holds_alternative<short>` will break, because `short` is not a variant member of its argument.
+
+Also draw your attention to the `s as short` clause at the start. Our `int`-valued variant misses this clause, even though `int` converts to `short`. The lack of active member access is something to fix as pattern matching designs are refined.
 
 ### Constraints and expressions
 
@@ -759,14 +759,11 @@ Oliver Twist -- Get more coins!
 [pattern2.cxx](pattern2.cxx) ports a sample from [P1317R3 - Pattern Matching](
 http://www.open-std.org/jtc1/sc22/wg21/docs/papers/2020/p1371r3.pdf). It demonstrates designated patterns and bindings. While the P2392 flavor of pattern matching generally separates declarations and tests (declarations go on the left inside bindings, tests go to the right inside patterns), bindings do imply static testing. The `[name: n]` binding requires that the initializer object has a data member called `name`, or that constraint with its successors will be dropped.
 
-### Dereference operator
+### `as` patterns
 
+![](as.png)
 
-
-
-### `operator as` with patterns must use `make_tuple`
-
-![](patterns.png)
+The proposal includes an _as-pattern_ mechanism, which is a kind of parallel cast operator. When the left-hand operand is a tuple-like type, the operand is converted element-wise, using the pattern on the right, where each terminal in the pattern is a type.
 
 ```cpp
 #include <iostream>
@@ -784,9 +781,77 @@ int main() {
 }
 ```
 
-With `std::forward_as_tuple`, this will crash at runtime, because the the temporary objects of type `short`, `long` and `double` expire at the end of the full expression. The tuple holds dangling references to them, and when they are used on the next line, the program will load uninitialized memory, and either segfault or just do the wrong thing.
+Because the result object of the parallel cast is a collection, we choose to return a tuple. P2392 suggests `std::forward_as_tuple` to construct the result object, but that won't actually work. That returns a tuple with the form `tuple<T1&&, T2&&, T3&&>`, that is, rvalue references to the materialized result objects of each element-wise conversion. But these materialized objects are destroyed at the end of the full statement.
 
-Patterns used as _as-operands_ convert each component and return a tuple built with `std::make_tuple`. This _copies_ the data into a tuple parameterized over those types _by value_, so the data doesn't expire at the end of the full expression.
+In the example above, the three `int` components of `foo_t` are converted to `short`, `long` and `double` by the _as-pattern_. Feeding those prvalues to `forward_to_tuple` causes their materialization to xvalues, and stores their addresses as rvalue-reference members in an `std::tuple`. At the end of the declaration statement, the memory holding those converted values is freed. The `std::cout` statement then prints the members of the tuple, loading data from references to expired memory. This program will crash, or run unpredictably. 
+
+However, constructing an _as-pattern_ result object with `std::make_tuple` does the right thing. The element-wise conversion results are copied into a tuple of the form `tuple<T1, T2, T3>`, which has storage for those values. The materialized temporaries still expire at the end of the declaration statement, but the `std::cout` statement on the next line draws from the tuple's copies, rather than the expired memory, so everything works.
+
+### Dereference pattern
+
+[**as.cxx**](as.cxx)
+```cpp
+#include <cstdio>
+#include <iostream>
+#include <tuple>
+
+template<typename type_t>
+void func(const type_t& obj) {
+  inspect(obj) {
+    // Try to convert a 3-element tuple-like:
+    // First element is convert to short.
+    // Second element is dereferenced and converted to float.
+    // Third element is dereferenced and converted to double.
+    tuple as [short, *float, **double] => {
+      std::cout<< decltype(tuple).string<< ": ";
+      (std::cout<< tuple...[:]<< " " ...)<< "\n";
+    }
+
+    // Follow * by _ to indicate wildcard. We don't try to convert to anything,
+    // we're only testing that an element is a pointer and non-null.
+    is [_, *_, **_] => std::cout<<type_t.string + ": passes pointer test\n";
+    
+    is _            => std::cout<< type_t.string + ": no match\n";
+  }
+}
+
+int main() {
+  int x = 10;
+  int y = 100; 
+  int z = 1000; int* pz = &z;
+
+  struct obj_t { int x, *y, **z; };
+  obj_t obj { x, &y, &pz };
+  func(obj);
+  
+  // Create a [value, pointer, pointer-to-pointer] of non-arithmetic types.
+  obj_t* pobj = &obj;
+  auto tuple = std::make_tuple(obj, &obj, &pobj);
+  func(tuple);
+
+  // Clear the middle pointer to nullptr.
+  get<1>(tuple) = nullptr;
+  func(tuple);
+}
+```
+```
+$ circle as.cxx && ./as
+std::tuple<short, float, double>&&: 10 100 1000 
+std::tuple<obj_t, obj_t*, obj_t**>: passes pointer test
+std::tuple<obj_t, obj_t*, obj_t**>: no match
+```
+
+The _as-pattern_ has a lot expressive density. The [as.cxx](as.cxx) sample shows off the _as-pattern_ `[short, *float, **double]`, which destructures the left-hand operand into three components:
+
+1. Converts the first component to `short`.
+2. Checks the validity of the pointer-like second operand, dereferences it, and converts the value there to `float`.
+3. Checks the validity of the pointer-like third operand, dereferences that and loads its value, then checks the validity of _that_ pointer-like value, dereferences _that_ and loads its value, and converts the loaded thing to `double`.
+
+If any of these tests or conversions fail either at compile or runtime, the _inspect-clause_ fails.
+
+What if we don't want the conversion, but just want the pointer checks? The _is-pattern_ `[_, *_, **_]` tests the pointers of the implicit left-hand operand the same way, but rather than using `std::make_tuple` to create a result object, just yields true or false.
+
+A big strength of pattern matching is that these expressions are substituted in a SFINAE context. If they fail structurally, the clause is dropped from the enclosing _inspect-definition_. If they fail at runtime, execution just goes to the next clause. Programming this with if/else logic would look pretty ragged, requiring an ugly mix of _if-constexpr_ and _requires-expressions_ to guard against substitution and runtime errors. 
 
 ### Multi-token type names
 
@@ -817,7 +882,7 @@ template<typename T>
 concept small_type = T is not void && sizeof(T) <= 4;
 ```
 
-You can mix cv-qualifiers and the array declarator `[bounds]` too. However, the tokens `&`, `&&` and `*` are _not_ greedily parsed as part of a type. Doing so would break no existing code, it's likely not what you want. The `small_type` concept has two atomic constraints: first, `T` is not void; second, `sizeof(T) <= 4`. We want `&&` to delimit the constraints, and if that token were parsed greedily, we'd have to wrap the left constraint in parentheses. `&` and `*` likewise have binary operators, and this design favors treating those tokens as operators. However we may greedily consume `[]`, because there is no binary operator `[]`.
+You can mix cv-qualifiers and the array declarator `[bounds]` too. However, the tokens `&`, `&&` and `*` are _not_ greedily parsed as part of a type. Although doing so would break no existing code, it's likely not what you want. The `small_type` concept has two atomic constraints: first, `T` is not void; second, `sizeof(T) <= 4`. We want `&&` to delimit the constraints, and if that token were parsed greedily, we'd have to wrap the left constraint in parentheses. `&` and `*` likewise have binary operators, and this design favors treating those tokens as operators. However we may greedily consume `[]`, because there is no binary operator `[]`.
 
 ### Potentially-throwing `operator as`
 

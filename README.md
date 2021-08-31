@@ -456,19 +456,19 @@ The story for `std::any` is worse. There's no way to figure out what an `any` ho
 
 // std::variant operator-is support.
 template<typename T, typename... Ts>
-requires((... || T == Ts))
+requires((... || T is Ts))
 constexpr bool operator is(const std::variant<Ts...>& x) {
   return holds_alternative<T>(x);
 }
 
 template<typename T, typename... Ts>
-requires((... || T == Ts))
+requires((... || T is Ts))
 constexpr T& operator as(std::variant<Ts...>& x) { 
   return get<T>(x);
 }
 
 template<typename T, typename... Ts>
-requires((... || T == Ts))
+requires((... || T is Ts))
 constexpr const T& operator as(const std::variant<Ts...>& x) { 
   return get<T>(x);
 }

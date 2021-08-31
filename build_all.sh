@@ -10,4 +10,4 @@ circle pattern.cxx -std=c++20
 circle pattern2.cxx -std=c++20
 circle as.cxx -std=c++20
 
-circle is.cxx -std=c++20
+circle meta.cxx -std=c++20

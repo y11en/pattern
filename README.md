@@ -251,7 +251,7 @@ Generic pattern matching code quickly exposes defects in the C++ standard librar
 
 This works great with the `const char*` parameter type: You'll see "Hello world" printed to the terminal. But what about the `std::nullptr_t` parameter type?
 
-Astonishingly, `std::string` has no constructor that takes a `std::nullptr_t`. Neither does `std::string_view`. These types allow the `std::nullptr_t` to decay to a null-valued `const char*`, and to initialize the string object _to an undefined state!_. In the libstdc++ implementation, `std::string` immediately throws `std::logic_error` and `std::string_view` segfaults. The sane behavior would be for both types to have deleted `std::nullptr_t` constructors (that is pattern-matching friendly, as the _inspect-clause_ would fail during substitution and just be removed as an inspect alternative) and for null-valued character pointers to create zero-length strings and views. Parts of the C++ standard library have easily-violated, non-obvious preconditions that lead to undefined behavior. Implementors should patch these problems, because they're sure to arise more often as pattern matching takes off.
+Astonishingly, `std::string` has no constructor that takes a `std::nullptr_t`. Neither does `std::string_view`. These types allow the `std::nullptr_t` to decay to a null-valued `const char*`, and to initialize the string object _to an undefined state!_ In the libstdc++ implementation, `std::string` immediately throws `std::logic_error` and `std::string_view` segfaults. The sane behavior would be for both types to have deleted `std::nullptr_t` constructors (that is pattern-matching friendly, as the _inspect-clause_ would fail during substitution and just be removed as an inspect alternative) and for null-valued character pointers to create zero-length strings and views. Parts of the C++ standard library have easily-violated, non-obvious preconditions that lead to undefined behavior. Implementors should patch these problems, because they're sure to arise more often as pattern matching takes off.
 
 In the [string.cxx](string.cxx) sample, you can uncomment the `is nullptr` clause to guard null-valued initializers. 
 
@@ -905,7 +905,7 @@ std::string to_string(const type_t& x) {
 
     is is_tuple_like    => 
       "[" + (... + 
-        ((int... ?? ", " : "") + to_string(x...[:]))
+        (int... ?? ", " : "") + to_string(x...[:])
       ) + "]";
 
     // All tuple-like types must have already returned.
@@ -913,7 +913,7 @@ std::string to_string(const type_t& x) {
     
     is std::is_class_v  => 
       "{" + (... + 
-        (((int... ?? ", " : "") + type_t.member_names + ": " + to_string(x...[:])))
+        (int... ?? ", " : "") + type_t.member_names + ": " + to_string(x...[:])
       ) + "}";
 
     // All class objects must have already returned.
@@ -965,7 +965,42 @@ pentagon
 unknown value of type foo_t<shapes_t, std::tuple<int, int>, double>*
 ```
 
+The braces in _inspect-statements_ and _inspect-expressions_ provide a scope in which you can define not just _inspect-clauses_, but `static_assert`s and any kind of meta statement. Meta control flow allows you to programmatically emit clauses.
 
+```cpp
+    // If the argument type is an enum, enter a new inspect-definition.
+    is std::is_enum_v {
+      // Loop over all enums in type_t and print them.
+      @meta for enum(type_t e : type_t)
+        is e => e.string;
+    }
+```
+
+During instantiation, if the _constraint-sequence_ of a clause is statically determined to be false, the successor is not instantiated. That guards against ill-formed constructs. If the argument type in the example above is an enumeration, the _inspect-group_ successor is instantiated. This triggers compile-time execution of the _for-enum-statement_. The loop body is instantiated for each enumerator constant in `type_t`. Because the inner-most enclosing non-meta scope is the _inspect-group_, the non-meta loop body `is e => e.string;` is treated as an _inspect-clause_. We can programmatically populate _inspect-clauses_ in an _inspect-statement_ using Circle's meta language.
+
+Another quality of life improvement of pattern matching over ordinary C++ is that when an _inspect-clause_ can be determined _statically_ to always return, all subsequent statements in the _inspect-definition_ will be skipped over, rather than be instantiated. 
+
+```cpp
+    is is_tuple_like    => 
+      "[" + (... + 
+        (int... ?? ", " : "") + to_string(x...[:])
+      ) + "]";
+
+    // All tuple-like types must have already returned.
+    static_assert(!is_tuple_like<type_t>);
+    
+    is std::is_class_v  => 
+      "{" + (... + 
+        (int... ?? ", " : "") + type_t.member_names + ": " + to_string(x...[:])
+      ) + "}";
+
+    // All class objects must have already returned.
+    static_assert(!type_t.is_class);
+```
+
+The successor to the `is is_tuple_like` constraint is a return expression. During instantiation on a tuple-like type, the compiler can statically determine that execution cannot go past the `is is_tuple_like` constraint; that clause will always return. Therefore, instantiation dismisses all subsequent statements in the _inspect-definition_. The `static_assert` won't fire, because it won't even be instantiated.
+
+This is a useful behavior that makes pattern matching programming less defensive than it may have otherwise needed to be. If an _inspect-clause_ matches a type and returns, then you can be assured that that type will never occur later on in the same _inspect-statement_. Essentially, you can code a defensive maneuver for each problematic type just once, rather than having to guard against it on each _inspect-constraint_. This also lessens the need to vigilantly [constrain templates or parameter types](#constraints) for helper functions called from pattern matching. If you match troublesome types before using those helpers, the helpers will not instantiate over those types, and the compiler will not reject your program as ill-formed.
 
 ### Multi-token type names
 

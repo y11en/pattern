@@ -538,13 +538,13 @@ The indexed form of `operator is` and `operator as` allows the compiler to inter
 
 ```cpp
 template<typename T, typename... Ts>
-requires((... || T == Ts))
+requires((... || T is Ts))
 constexpr bool operator is(const std::variant<Ts...>& x) {
   return holds_alternative<T>(x);
 }
 
 template<typename T, typename... Ts>
-requires((... || T == Ts))
+requires((... || T is Ts))
 constexpr T& operator as(std::variant<Ts...>& x) { 
   return get<T>(x);
 }

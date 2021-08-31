@@ -437,7 +437,7 @@ In the first line, `^` generates a switch for all variant members, and attempts 
 
 In the second line, `^` generates a switcth for all variant members, and tests each alternative against the `std::integral` constraint. If the active member passes this test, the binding `i` is initialized by unpacking the active member of the initializer. That is, `i` would not be a `variant`, but would be the type of whatever the variant holds. 
 
-If the initializer expression isn't a variant (i.e. doesn't have an indexed form of `operator is`), then `^` is a no-op, and pattern matching does business as usual.
+If the initializer expression isn't a variant (i.e. doesn't have an indexed form of `operator is`), then `^` is a no-op, and pattern matching does business as usual. This is all speculative on my part; I haven't yet implemented this pattern operator.
 
 My opinion is that much of the power of the pattern matching proposal is left on the table, by not making its semantics available to a variant's active member.
 

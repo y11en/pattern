@@ -16,7 +16,7 @@ void func(const type_t& obj) {
 
     // Follow * by _ to indicate wildcard. We don't try to convert to anything,
     // we're only testing that an element is a pointer and non-null.
-    is [_, *_, **_] => std::cout<<type_t.string + ": passes pointer test\n";
+    is [_, *_, **_] => std::cout<< type_t.string + ": passes pointer test\n";
     
     is _            => std::cout<< type_t.string + ": no match\n";
   }
